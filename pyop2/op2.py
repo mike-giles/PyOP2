@@ -42,7 +42,7 @@ INC   = Access("inc")
 
 class IterationSpace(object):
 
-    def __init__(self, set, *dims):
+    def __init__(self, set, dims):
         self._set = set
         self._dims = dims
 
