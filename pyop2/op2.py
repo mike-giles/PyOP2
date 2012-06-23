@@ -36,8 +36,8 @@ class Access(object):
 
 READ  = Access("read")
 WRITE = Access("write")
-INC   = Access("inc")
 RW    = Access("rw")
+INC   = Access("inc")
 
 class IterationSpace(object):
 
@@ -73,6 +73,7 @@ class Kernel(object):
 
 class Set(object):
     """Represents an OP2 Set."""
+
     def __init__(self, size, name):
         self._size = size
         self._name = name
@@ -95,12 +96,25 @@ class Dat(DataCarrier):
     """Represents OP2 vector data. A Dat holds a value for every member of a
     set."""
 
+    _modes = [READ, WRITE, RW, INC]
+
     def __init__(self, set, dim, datatype, data, name):
         self._set = set
         self._dim = dim
         self._datatype = datatype
         self._data = data
         self._name = name
+
+    def __call__(self, map, access):
+        assert access in self._modes, \
+                "Acess descriptor must be one of %s" % self._modes
+        assert map._set == self._set, \
+                "Invalid data set for map %s (is %s, should be %s)" \
+                % (map._name, map._set._name, self._set._name)
+        arg = copy(self)
+        arg._map = map
+        arg._access = access
+        return arg
 
     def __str__(self):
         return "OP2 Dat: %s on DataSet %s with dim %s and datatype %s" \
@@ -114,29 +128,45 @@ class Mat(DataCarrier):
     """Represents OP2 matrix data. A Mat is defined on the cartesian product
     of two Sets, and holds an value for each element in the product"""
 
-    def __init__(self, row_set, col_set, dim, datatype, name):
-        self._row_set = row_set
-        self._col_set = col_set
+    _modes = [READ, WRITE, RW, INC]
+
+    def __init__(self, sets, dim, datatype, name):
+        self._sets = sets
         self._dim = dim
         self._datatype = datatype
         self._name = name
 
+    def __call__(self, maps, access):
+        assert access in self._modes, \
+                "Acess descriptor must be one of %s" % self._modes
+        for map, set in zip(maps, self._sets):
+            assert map._set == set, \
+                    "Invalid set for map %s (is %s, should be %s)" \
+                    % (map._name, map._set._name, set._name)
+        arg = copy(self)
+        arg._maps = maps
+        arg._access = access
+        return arg
+
     def __str__(self):
         return "OP2 Mat: %s, row set %s, col set %s, dimension %s, datatype %s" \
-               % (self._name, self._row_set, self._col_set, self._dim, self._datatype)
+               % (self._name, self._sets[0], self._sets[1], self._dim, self._datatype)
 
     def __repr__(self):
         return "Mat(%s,%s,%s,'%s','%s')" \
-               % (self._row_set, self._col_set, self._dim, self._datatype, self._name)
+               % (self._sets[0], self._sets[1], self._dim, self._datatype, self._name)
 
 class Const(DataCarrier):
     """Represents a value that is constant for all elements of all sets."""
 
+    _modes = [READ]
+
     def __init__(self, dim, datatype, value, name):
         self._dim = dim
         self._datatype = datatype
-        self._data = value
+        self._value = value
         self._name = name
+        self._access = READ
 
     def __str__(self):
         return "OP2 Const value: %s of dim %s and type %s, value %s" \
@@ -149,9 +179,18 @@ class Const(DataCarrier):
 class Global(DataCarrier):
     """Represents an OP2 global value."""
 
+    _modes = [READ, INC]
+
     def __init__(self, name, val=0):
         self._val = val
         self._name = name
+
+    def __call__(self, access):
+        assert access in self._modes, \
+                "Acess descriptor must be one of %s" % self._modes
+        arg = copy(self)
+        arg._access = access
+        return arg
 
     def __str__(self):
         return "OP2 Global Argument: %s with value %s"
